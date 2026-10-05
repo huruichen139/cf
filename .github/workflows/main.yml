@@ -2,18 +2,24 @@ name: Cloudflare Speed Test
 
 on:
   schedule:
-    # 每天北京时间 8:00 运行 (UTC 00:00)
     - cron: '0 0 * * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   speed-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # 设置45分钟超时，足够完成测试
-    
+    timeout-minutes: 45
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -23,16 +29,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Run Cloudflare Speed Test (All IPs)
+      - name: Run Cloudflare Speed Test
         run: |
-          # 测试全部 IP，超时2秒
           go run . -t 2 -p 443 -f ip.txt -o ip.txt
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: speed-test-results
-          path: ip.txt
 
       - name: Commit and push changes
         run: |
@@ -40,4 +39,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add ip.txt ipv6.txt
           git commit -m "Update IP list [skip ci]" || echo "No changes to commit"
-          git push
+          git pull --rebase origin master
+          git push origin master
